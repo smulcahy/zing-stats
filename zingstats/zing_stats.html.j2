@@ -4,6 +4,9 @@
         <meta charset="utf-8">
         <title>{{ title }}</title>
 
+        <!-- http://jquery.com/ -->
+        <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+
         <!-- Latest compiled and minified CSS -->
         <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
 
@@ -13,8 +16,24 @@
         <!-- Latest compiled and minified JavaScript -->
         <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
 
+        <!-- https://mottie.github.io/tablesorter/docs/ -->
+        <!-- https://stackoverflow.com/a/18049842 -->
+        <!-- https://stackoverflow.com/a/14251903 -->
+        <link rel="stylesheet" href="https://cdn.rawgit.com/Mottie/tablesorter/v2.29.6/dist/css/theme.blue.min.css">
+        <script src="https://cdn.rawgit.com/Mottie/tablesorter/v2.29.6/dist/js/jquery.tablesorter.min.js"></script> 
+        <script src="https://cdn.rawgit.com/Mottie/tablesorter/v2.29.6/dist/js/jquery.tablesorter.widgets.min.js"></script> 
+<script>
+	$(function(){
+	  $("table").tablesorter({
+theme: 'blue',
+widgets: ['zebra']
+});
+	});
+	</script>
+
         <!-- plot.ly js -->
         <script src="https://cdn.plot.ly/plotly-1.25.2.min.js"></script>
+
 
         <style>
             .cr {
@@ -74,7 +93,7 @@
                     <h1> {{ title }} </h1>
                 </div>
                 <ul class="nav nav-tabs">
-                    {% for group in group_list|sort %}
+                    {% for group in group_list %}
                         {% set is_active, url = "", group.lower() %}
                         {% if group == 'All' %}
                             {% set url = 'index' %}
@@ -82,7 +101,7 @@
                         {% if group == current_group %}
                             {% set is_active = 'class="active"' %}
                         {% endif %}
-                        <li role="presentation" {{ is_active }}><a href="{{ url }}.html">{{ group }}</a></li>
+                        <li role="presentation" {{ is_active }}><a href="{{ url|replace(" ", "_") }}.html">{{ group }}</a></li>
                     {% endfor %}
                 </ul>
             </div>
@@ -100,31 +119,56 @@
             </div>
             <div class="row">
                 <div class="table-responsive">
-                    <table class="table table-striped">
+                    <table class="tablesorter">
+                        <thead>
                         <tr>
+                            <th></th>
                             <th>Project</th>
-                            <th>Changes created</th>
-                            <th>Changes updated</th>
-                            <th>Changes merged</th>
-                            <th>Patches /change (mean)</th>
+                            <th>Type</th>
+                            <th>Changes/PRs created</th>
+                            <th>Changes/PRs updated</th>
+                            <th>Changes/PRs merged</th>
+                            <th>Successul promotions</th>
+                            <th>Failed promotions</th>
+                            <th>Promotion success</th>
+                            <th>Patches/Commits per change/PR (mean)</th>
                             <th>CI time (total)</th>
                             <th>CI longest job duration (max)</th>
                             <th>CI run success</th>
                             <th>CI run failure</th>
-                            <th>Change lifespan (mean)</th>
+                            <th>Change/PR lifespan (mean)</th>
                             <th>Recheck count (mean)</th>
                             <th>Reverify count (mean)</th>
-                            <th>Has CI check</th>
-                            <th>Has CI gate</th>
                         </tr>
+                        </thead>
+                        <tbody class="avoid-sort">
                         <tr>
+                            <th></th>
                             <th>Total</th>
+                            <th></th>
                             <th>{{ '%0.0f' % df['total']['created'].sum()|float }}</th>
                             <th>{{ '%0.0f' % df['total']['updated'].sum()|float }}</th>
                             <th>{{ '%0.0f' % df['total']['merged'].sum()|float }}</th>
-                            <th>{{ '%0.1f' % df['total']['revisions'].mean()|float }}</th>
+                            <th>{{ '%0.0f' % df['total']['promotion_success'].sum()|float }}</th>
+                            <th>{{ '%0.0f' % df['total']['promotion_failure'].sum()|float }}</th>
+                            {% set promotion_total = df['total']['promotion_success'].sum() + df['total']['promotion_failure'].sum() %}
+                            {% if promotion_total <= 0 %}
+                                {% set pct_promotion_success = 0 %}
+                            {% else %}
+                                {% set pct_promotion_success = df['total']['promotion_success'].sum()/promotion_total %}
+                            {% endif %}
+                            <th>{{ '%0.1f' % (pct_promotion_success * 100)|float }}%</th>
+                            {% if df['total']['revisions'].size > 0 %}
+                                <th>{{ '%0.1f' % df['total']['revisions'].mean()|float }}</th>
+                            {% else %}
+                                <th>0.0</th>
+                            {% endif %}
                             <th>{{ '%0.1f' % (df['total']['ci_total_time_sec'].sum()/60.0)|float }}min</th>
-                            <th>{{ '%0.1f' % (df['total']['ci_longest_time_sec'].max()/60.0)|float }} min</th>
+                            {% if df['total']['ci_longest_time_sec'].size > 0 %}
+                                <th>{{ '%0.1f' % (df['total']['ci_longest_time_sec'].max()/60.0)|float }} min</th>
+                            {% else %}
+                                <th>0.0</th>
+                            {% endif %}
                             {% set ci_total = df['total']['ci_success'].sum() + df['total']['ci_failure'].sum() %}
                             {% if ci_total <= 0 %}
                                 {% set ci_success = 0 %}
@@ -135,22 +179,52 @@
                             {% endif %}
                             <th>{{ '%0.1f' % (ci_success * 100)|float }}%</th>
                             <th>{{ '%0.1f' % (ci_failure * 100)|float }}%</th>
-                            <th>{{ '%0.1f' % (df['total']['lifespan_sec'].mean()/3600)|float }} hour</th>
-                            <th>{{ '%0.1f' % df['total']['recheck'].mean()|float }}</th>
-                            <th>{{ '%0.1f' % df['total']['reverify'].mean()|float }}</th>
-                            <th>n/a</th>
-                            <th>n/a</th>
+                            {% if df['total']['lifespan_sec'].size > 0 %}
+                                <th>{{ '%0.1f' % (df['total']['lifespan_sec'].mean()/3600)|float }} hour</th>
+                            {% else %}
+                                <th>0.0</th>
+                            {% endif %}
+                            {% if df['total']['recheck'].size > 0 %}
+                                <th>{{ '%0.1f' % df['total']['recheck'].mean()|float }}</th>
+                            {% else %}
+                                <th>0.0</th>
+                            {% endif %}
+                            {% if df['total']['reverify'].size > 0 %}
+                                <th>{{ '%0.1f' % df['total']['reverify'].mean()|float }}</th>
+                            {% else %}
+                                <th>0.0</th>
+                            {% endif %}
                         </tr>
-
+			        </tbody>
+			        <tbody>
                         {% for project in projects_to_report|sort if project != 'total' %}
                             <tr>
+                                <td>{{ loop.index }}</td>
                                 <td>{{ project }}</td>
+                                <td>{{ projects_map[project] }}</td>
                                 <td>{{ '%0.0f' % df[project]['created'].sum()|float }}</td>
                                 <td>{{ '%0.0f' % df[project]['updated'].sum()|float }}</td>
                                 <td>{{ '%0.0f' % df[project]['merged'].sum()|float }}</td>
-                                <td>{{ '%0.1f' % df[project]['revisions'].mean()|float }}</td>
+                                <td>{{ '%0.0f' % df[project]['promotion_success'].sum()|float }}</td>
+                                <td>{{ '%0.0f' % df[project]['promotion_failure'].sum()|float }}</td>
+                                {% set promotion_total = df[project]['promotion_success'].sum() + df[project]['promotion_failure'].sum() %}
+                                {% if promotion_total <= 0 %}
+                                    {% set pct_promotion_success = 0 %}
+                                {% else %}
+                                    {% set pct_promotion_success = df[project]['promotion_success'].sum()/promotion_total %}
+                                {% endif %}
+                                <td>{{ '%0.1f' % (pct_promotion_success * 100)|float }}%</td>
+                                {% if df[project]['revisions'].size > 0 %}
+                                    <td>{{ '%0.1f' % df[project]['revisions'].mean()|float }}</td>
+                                {% else %}
+                                    <td>0.0</td>
+                                {% endif %}
                                 <td>{{ '%0.1f' % (df[project]['ci_total_time_sec'].sum()/60.0)|float }} min</td>
-                                <td>{{ '%0.1f' % (df[project]['ci_longest_time_sec'].max()/60.0)|float }} min</td>
+                                {% if df[project]['ci_longest_time_sec'].size > 0 %}
+                                    <td>{{ '%0.1f' % (df[project]['ci_longest_time_sec'].max()/60.0)|float }} min</td>
+                                {% else %}
+                                    <td>0.0</td>
+                                {% endif %}
                                 {% set ci_total = df[project]['ci_success'].sum() + df[project]['ci_failure'].sum() %}
                                 {% if ci_total <= 0 %}
                                     {% set ci_success = 0 %}
@@ -161,25 +235,24 @@
                                 {% endif %}
                                 <td>{{ '%0.1f' % (ci_success * 100)|float }}%</td>
                                 <td>{{ '%0.1f' % (ci_failure * 100)|float }}%</td>
-                                <td>{{ '%0.1f' % (df[project]['lifespan_sec'].mean()/3600)|float }} hour</td>
-                                <td>{{ '%0.1f' % df[project]['recheck'].mean()|float }}</td>
-                                <td>{{ '%0.1f' % df[project]['reverify'].mean()|float }}</td>
-                                <td>
-                                {% if all_projects[project]['ci_check'] %}
-                                    Y
+                                {% if df[project]['lifespan_sec'].size > 0 %}
+                                    <td>{{ '%0.1f' % (df[project]['lifespan_sec'].mean()/3600)|float }} hour</td>
                                 {% else %}
-                                    N
+                                    <td>0.0</td>
                                 {% endif %}
-                                </td>
-                                <td>
-                                {% if all_projects[project]['ci_gate'] %}
-                                    Y
+                                {% if df[project]['recheck'].size > 0 %}
+                                    <td>{{ '%0.1f' % df[project]['recheck'].mean()|float }}</td>
                                 {% else %}
-                                    N
+                                    <td>0.0</td>
                                 {% endif %}
-                                </td>
+                                {% if df[project]['reverify'].size > 0 %}
+                                    <td>{{ '%0.1f' % df[project]['reverify'].mean()|float }}</td>
+                                {% else %}
+                                    <td>0.0</td>
+                                {% endif %}
                             </tr>
                         {% endfor %}
+			            </tbody>
                     </table>
 
                 </div>
@@ -191,13 +264,27 @@
                     </div>
                     <div class="col-md-10 col-md-offset-1">
                         <small>
-                            Generated at {{ finish_dt.strftime('%H:%M') }} on {{ finish_dt.strftime('%d-%b-%Y') }} by https://github.com/HewlettPackard/zing-stats,
+                            Generated at {{ finish_dt.strftime('%H:%M') }} on {{ finish_dt.strftime('%d-%b-%Y') }} by https://github.com/HewlettPackard/zing-stats
+                            {% if zs_ver %}
+                             ({{ zs_ver }})
+                            {% endif %}
+                            ,
                             bugs to <a href={{ report_issue_link }}>{{ report_issue_link }}</a>, queries to
                             <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>
+                        </small>
+                    </div>
+                    <div class="col-md-10 col-md-offset-1">
+                        <small>
+                            Inaccessible project:
+                            {% for proj in not_found_proj|sort %}
+                                {{ proj }}
+                                {{ "," if not loop.last }}
+                            {% endfor %}
                         </small>
                     </div>
                 </div>
             </div>
         </div>
+
     </body>
 </html>

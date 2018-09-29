@@ -1,0 +1,33 @@
+#!/bin/bash
+#
+# (c) Copyright 2018 Hewlett Packard Enterprise Development LP
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+# docker automated builds sets a number of env vars including
+#  SOURCE_BRANCH: the name of the branch or the tag that is currently being tested.
+#  DOCKER_REPO: the name of the Docker repository being built.
+# https://docs.docker.com/docker-cloud/builds/advanced/#environment-variables-for-building-and-testing
+
+# If we're building from a https://semver.org/ tag then use that for the
+# image version, otherwise use the branch name + the abbreviated git sha1
+if [[ $SOURCE_BRANCH =~ ^[0-9].[0-9].[0-9]$ ]]; then
+    VERSION="$SOURCE_BRANCH"
+else
+    git fetch --unshallow origin
+    VERSION=$(git describe --tags)
+fi
+
+docker image build --build-arg VERSION="$VERSION" --tag "$DOCKER_REPO:$VERSION" .
+docker image build --build-arg VERSION="$VERSION" --tag "$DOCKER_REPO:latest" .
